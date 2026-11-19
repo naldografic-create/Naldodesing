@@ -1,375 +1,414 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NALDO GRAFIC DESING - Preprensa DTF & Vectores</title>
-  <link rel="manifest" href="manifest.json" />
-  <style>
-    :root {
-      --bg-dark: #0a0c10;
-      --panel-gray: #161b22;
-      --border-gray: #30363d;
-      --accent-blue: #1f6feb;
-      --accent-blue-hover: #388bfd;
-      --text-light: #f0f6fc;
-      --text-muted: #8b949e;
-      --canvas-dtf: #505050;
-    }
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const artboardWrapper = document.getElementById('artboardWrapper');
+const canvasStatus = document.getElementById('canvasStatus');
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    }
+// Estado de la aplicación
+let originalImage = null;
+let workingCanvas = document.createElement('canvas');
+let workingCtx = workingCanvas.getContext('2d', { willReadFrequently: true });
 
-    body {
-      background-color: var(--bg-dark);
-      color: var(--text-light);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
+let imgX = 0;
+let imgY = 0;
+let imgScale = 1;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let halftoneActive = false;
+let currentSVGData = null;
 
-    /* Barra Superior */
-    header {
-      background-color: var(--panel-gray);
-      border-bottom: 2px solid var(--accent-blue);
-      padding: 10px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
+// Conversión CM a Píxeles de trabajo (base 300 DPI escalada para fluidez)
+const PX_PER_CM_EXPORT = 118.11; // 300 DPI reales
+const PREVIEW_RATIO = 15; // Escala visual en pantalla
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+function updateArtboardSize() {
+  const wCm = parseFloat(document.getElementById('canvasWidthCm').value) || 28;
+  const hCm = parseFloat(document.getElementById('canvasHeightCm').value) || 40;
 
-    .brand h1 {
-      font-size: 1.3rem;
-      letter-spacing: 1.5px;
-      color: var(--text-light);
-    }
+  // Tamaño interno de alta resolución (hasta 300 DPI)
+  canvas.width = Math.round(wCm * PX_PER_CM_EXPORT);
+  canvas.height = Math.round(hCm * PX_PER_CM_EXPORT);
 
-    .brand span {
-      background: var(--accent-blue);
-      color: #fff;
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: bold;
-    }
+  // Tamaño visual ajustado a la pantalla manteniendo proporción exacta en cm
+  const maxVisualW = window.innerWidth * 0.6;
+  const maxVisualH = window.innerHeight * 0.78;
+  let visualW = wCm * PREVIEW_RATIO;
+  let visualH = hCm * PREVIEW_RATIO;
 
-    .top-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
+  const scaleFit = Math.min(maxVisualW / visualW, maxVisualH / visualH, 1.5);
+  artboardWrapper.style.width = `${Math.round(visualW * scaleFit)}px`;
+  artboardWrapper.style.height = `${Math.round(visualH * scaleFit)}px`;
 
-    button, .file-label {
-      background-color: #21262d;
-      color: var(--text-light);
-      border: 1px solid var(--border-gray);
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
+  canvasStatus.textContent = `Lienzo: ${wCm} cm × ${hCm} cm (${canvas.width} × ${canvas.height} px @ 300 DPI)`;
+  renderCanvas();
+}
 
-    button:hover, .file-label:hover {
-      border-color: var(--accent-blue);
-      background-color: #29313d;
-    }
+// Inicializar lienzo
+updateArtboardSize();
 
-    button.primary, .file-label.primary {
-      background-color: var(--accent-blue);
-      border-color: var(--accent-blue);
-      color: #ffffff;
-    }
+document.getElementById('btnApplyCanvas').addEventListener('click', updateArtboardSize);
 
-    button.primary:hover, .file-label.primary:hover {
-      background-color: var(--accent-blue-hover);
-    }
+// Importar cualquier formato de imagen
+document.getElementById('imageInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    button.active-tool {
-      background-color: #0d419d;
-      border-color: #58a6ff;
-      box-shadow: 0 0 8px rgba(56, 139, 253, 0.5);
-    }
+  const reader = new FileReader();
+  reader.onload = function (event) {
+    const img = new Image();
+    img.onload = function () {
+      originalImage = img;
+      resetWorkingImage();
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 
-    input[type="file"] {
-      display: none;
-    }
+function resetWorkingImage() {
+  if (!originalImage) return;
+  workingCanvas.width = originalImage.width;
+  workingCanvas.height = originalImage.height;
+  workingCtx.clearRect(0, 0, workingCanvas.width, workingCanvas.height);
+  workingCtx.drawImage(originalImage, 0, 0);
 
-    /* Contenedor Principal */
-    .workspace {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
+  // Centrar y ajustar imagen al lienzo libre
+  const fitRatio = Math.min(
+    (canvas.width * 0.8) / workingCanvas.width,
+    (canvas.height * 0.8) / workingCanvas.height
+  );
+  imgScale = fitRatio;
+  document.getElementById('imgScale').value = 100;
+  document.getElementById('scaleVal').textContent = '100%';
 
-    /* Panel Izquierdo de Herramientas */
-    aside.sidebar {
-      width: 310px;
-      background-color: var(--panel-gray);
-      border-right: 1px solid var(--border-gray);
-      padding: 15px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
+  imgX = (canvas.width - workingCanvas.width * imgScale) / 2;
+  imgY = (canvas.height - workingCanvas.height * imgScale) / 2;
 
-    .tool-section {
-      background-color: #0d1117;
-      border: 1px solid var(--border-gray);
-      border-radius: 8px;
-      padding: 12px;
-    }
+  halftoneActive = false;
+  document.getElementById('btnHalftone').classList.remove('active-tool');
+  currentSVGData = null;
+  renderCanvas();
+}
 
-    .tool-section h3 {
-      font-size: 0.85rem;
-      color: #58a6ff;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      border-bottom: 1px solid var(--border-gray);
-      padding-bottom: 5px;
-    }
+document.getElementById('btnReset').addEventListener('click', resetWorkingImage);
 
-    .control-row {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      margin-bottom: 10px;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
+// Renderizar en el lienzo libre
+function renderCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!originalImage) return;
 
-    .control-row label {
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-light);
-    }
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(
+    workingCanvas,
+    imgX,
+    imgY,
+    workingCanvas.width * imgScale,
+    workingCanvas.height * imgScale
+  );
+  ctx.restore();
+}
 
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
+// Escala de imagen en el lienzo
+document.getElementById('imgScale').addEventListener('input', (e) => {
+  if (!originalImage) return;
+  const pct = parseInt(e.target.value, 10);
+  document.getElementById('scaleVal').textContent = `${pct}%`;
 
-    input[type="number"], select {
-      background-color: #161b22;
-      border: 1px solid var(--border-gray);
-      color: var(--text-light);
-      padding: 6px;
-      border-radius: 4px;
-      width: 100%;
-    }
+  const baseFit = Math.min(
+    (canvas.width * 0.8) / workingCanvas.width,
+    (canvas.height * 0.8) / workingCanvas.height
+  );
+  const centerX = imgX + (workingCanvas.width * imgScale) / 2;
+  const centerY = imgY + (workingCanvas.height * imgScale) / 2;
 
-    input[type="range"] {
-      accent-color: var(--accent-blue);
-      width: 100%;
-    }
+  imgScale = baseFit * (pct / 100);
+  imgX = centerX - (workingCanvas.width * imgScale) / 2;
+  imgY = centerY - (workingCanvas.height * imgScale) / 2;
+  renderCanvas();
+});
 
-    input[type="color"] {
-      width: 100%;
-      height: 32px;
-      border: none;
-      background: none;
-      cursor: pointer;
-    }
+// Mover imagen libremente dentro del lienzo
+canvas.addEventListener('mousedown', (e) => {
+  if (!originalImage) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
 
-    /* Área del Lienzo Libre */
-    main.canvas-area {
-      flex: 1;
-      background-color: #050709;
-      background-image: radial-gradient(#21262d 1px, transparent 1px);
-      background-size: 20px 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: auto;
-      padding: 30px;
+  // Cuentagotas si se presiona Alt o clic derecho
+  if (e.altKey || e.button === 2) {
+    const clickX = Math.floor((e.clientX - rect.left) * scaleX);
+    const clickY = Math.floor((e.clientY - rect.top) * scaleY);
+    const pixel = ctx.getImageData(clickX, clickY, 1, 1).data;
+    if (pixel[3] > 0) {
+      const hex = `#${((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1)}`;
+      document.getElementById('targetColor').value = hex;
     }
+    return;
+  }
 
-    .ruler-info {
-      position: absolute;
-      top: 10px;
-      left: 15px;
-      background: rgba(22, 27, 34, 0.9);
-      border: 1px solid var(--accent-blue);
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      color: #58a6ff;
-      z-index: 10;
+  isDragging = true;
+  dragStartX = (e.clientX - rect.left) * scaleX - imgX;
+  dragStartY = (e.clientY - rect.top) * scaleY - imgY;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  imgX = (e.clientX - rect.left) * scaleX - dragStartX;
+  imgY = (e.clientY - rect.top) * scaleY - dragStartY;
+  renderCanvas();
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+});
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Actualizar etiquetas de sliders
+document.getElementById('colorTolerance').addEventListener('input', (e) => {
+  document.getElementById('tolVal').textContent = e.target.value;
+});
+document.getElementById('alphaThreshold').addEventListener('input', (e) => {
+  document.getElementById('alphaVal').textContent = e.target.value;
+});
+document.getElementById('halftoneSize').addEventListener('input', (e) => {
+  document.getElementById('dotSizeVal').textContent = e.target.value;
+});
+document.getElementById('halftoneContrast').addEventListener('input', (e) => {
+  document.getElementById('contrastVal').textContent = e.target.value;
+});
+document.getElementById('vecPrecision').addEventListener('input', (e) => {
+  document.getElementById('vecDetailVal').textContent = e.target.value;
+});
+
+// Convertir HEX a RGB
+function hexToRgb(hex) {
+  const bigint = parseInt(hex.slice(1), 16);
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255
+  };
+}
+
+// 1. Quitar color específico y dejar fondo transparente
+function removeSelectedColor(rgbTarget, tolerance) {
+  if (!originalImage) return;
+  const imgData = workingCtx.getImageData(0, 0, workingCanvas.width, workingCanvas.height);
+  const data = imgData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const dr = data[i] - rgbTarget.r;
+    const dg = data[i + 1] - rgbTarget.g;
+    const db = data[i + 2] - rgbTarget.b;
+    const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+
+    if (distance <= tolerance) {
+      data[i + 3] = 0; // Transparente total
     }
+  }
+  workingCtx.putImageData(imgData, 0, 0);
+  renderCanvas();
+}
 
-    .artboard-wrapper {
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8);
-      border: 2px solid var(--accent-blue);
-      background-color: var(--canvas-dtf);
-      background-image:
-        linear-gradient(45deg, #424242 25%, transparent 25%),
-        linear-gradient(-45deg, #424242 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, #424242 75%),
-        linear-gradient(-45deg, transparent 75%, #424242 75%);
-      background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: width 0.2s, height 0.2s;
+document.getElementById('btnRemoveColor').addEventListener('click', () => {
+  const hex = document.getElementById('targetColor').value;
+  const tol = parseInt(document.getElementById('colorTolerance').value, 10);
+  removeSelectedColor(hexToRgb(hex), tol);
+});
+
+// Auto-detectar color de esquina superior izquierda para quitar fondo rápido
+document.getElementById('btnAutoBg').addEventListener('click', () => {
+  if (!originalImage) return;
+  const corner = workingCtx.getImageData(0, 0, 1, 1).data;
+  const tol = parseInt(document.getElementById('colorTolerance').value, 10);
+  removeSelectedColor({ r: corner[0], g: corner[1], b: corner[2] }, tol);
+});
+
+// 2. Eliminar Semitransparencias (Bordes limpios para DTF)
+document.getElementById('btnCleanAlpha').addEventListener('click', () => {
+  if (!originalImage) return;
+  const threshold = parseInt(document.getElementById('alphaThreshold').value, 10);
+  const imgData = workingCtx.getImageData(0, 0, workingCanvas.width, workingCanvas.height);
+  const data = imgData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < threshold) {
+      data[i + 3] = 0; // Elimina píxeles semitransparentes
+    } else {
+      data[i + 3] = 255; // Solidifica al 100%
     }
+  }
+  workingCtx.putImageData(imgData, 0, 0);
+  renderCanvas();
+});
 
-    canvas {
-      max-width: 100%;
-      max-height: 100%;
-      cursor: grab;
+// 3. Botón Activo de Semitonos Redondos
+document.getElementById('btnHalftone').addEventListener('click', () => {
+  if (!originalImage) return;
+  const btn = document.getElementById('btnHalftone');
+  halftoneActive = !halftoneActive;
+
+  if (!halftoneActive) {
+    btn.classList.remove('active-tool');
+    resetWorkingImage();
+    return;
+  }
+
+  btn.classList.add('active-tool');
+  const step = parseInt(document.getElementById('halftoneSize').value, 10);
+  const contrast = parseFloat(document.getElementById('halftoneContrast').value);
+
+  const w = workingCanvas.width;
+  const h = workingCanvas.height;
+  const srcData = workingCtx.getImageData(0, 0, w, h).data;
+
+  // Limpiar workingCanvas para dibujar puntos redondos sobre fondo 100% transparente
+  workingCtx.clearRect(0, 0, w, h);
+
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      const px = Math.min(x + Math.floor(step / 2), w - 1);
+      const py = Math.min(y + Math.floor(step / 2), h - 1);
+      const idx = (py * w + px) * 4;
+
+      const r = srcData[idx];
+      const g = srcData[idx + 1];
+      const b = srcData[idx + 2];
+      const a = srcData[idx + 3];
+
+      if (a < 30) continue; // Respetar transparencia
+
+      // Luminosidad para calcular el radio del punto redondo
+      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      let intensity = (1 - lum * 0.75) * contrast;
+      intensity = Math.max(0.15, Math.min(1, intensity));
+
+      const radius = (step / 2) * intensity;
+
+      workingCtx.beginPath();
+      workingCtx.arc(x + step / 2, y + step / 2, radius, 0, Math.PI * 2);
+      workingCtx.fillStyle = `rgb(${r},${g},${b})`;
+      workingCtx.fill();
     }
+  }
+  renderCanvas();
+});
 
-    canvas:active {
-      cursor: grabbing;
+// 4. Vectorizar automáticamente (Suavizado sin píxeles + generación de trazos SVG)
+document.getElementById('btnVectorize').addEventListener('click', () => {
+  if (!originalImage) return;
+  const detail = parseInt(document.getElementById('vecPrecision').value, 10);
+
+  // Escalar al doble con interpolación bicúbica y cuantización limpia de bordes
+  const scaleUp = 2;
+  const w = workingCanvas.width * scaleUp;
+  const h = workingCanvas.height * scaleUp;
+
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = w;
+  tempCanvas.height = h;
+  const tempCtx = tempCanvas.getContext('2d');
+
+  tempCtx.imageSmoothingEnabled = true;
+  tempCtx.imageSmoothingQuality = 'high';
+  tempCtx.drawImage(workingCanvas, 0, 0, w, h);
+
+  const imgData = tempCtx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+
+  // Posterización suave para eliminar ruido de píxeles manteniendo colores intactos
+  const levels = Math.max(8, 32 - detail * 2);
+  const factor = 255 / (levels - 1);
+
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) {
+      data[i + 3] = 0;
+    } else {
+      data[i + 3] = 255;
+      data[i] = Math.round(Math.round(data[i] / factor) * factor);
+      data[i + 1] = Math.round(Math.round(data[i + 1] / factor) * factor);
+      data[i + 2] = Math.round(Math.round(data[i + 2] / factor) * factor);
     }
+  }
 
-    @media (max-width: 768px) {
-      .workspace {
-        flex-direction: column;
+  tempCtx.putImageData(imgData, 0, 0);
+
+  // Actualizar imagen de trabajo libre de píxeles
+  workingCanvas.width = w;
+  workingCanvas.height = h;
+  workingCtx.clearRect(0, 0, w, h);
+  workingCtx.drawImage(tempCanvas, 0, 0);
+  imgScale = imgScale / scaleUp;
+  renderCanvas();
+
+  // Generar archivo vectorial SVG limpio por bloques de color
+  generateSVGFromCanvas(tempCanvas, detail);
+  canvasStatus.textContent = '✅ Imagen vectorizada sin píxeles. Lista para descargar en PNG o SVG.';
+});
+
+function generateSVGFromCanvas(sourceCanvas, stepSize) {
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+  const data = sourceCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+  const step = Math.max(2, Math.floor(stepSize / 2));
+
+  let paths = '';
+  for (let y = 0; y < h; y += step) {
+    let runColor = null;
+    let runStart = 0;
+    let runLen = 0;
+
+    for (let x = 0; x < w; x += step) {
+      const idx = (y * w + x) * 4;
+      const a = data[idx + 3];
+      const hex = a > 128
+        ? `#${((1 << 24) + (data[idx] << 16) + (data[idx + 1] << 8) + data[idx + 2]).toString(16).slice(1)}`
+        : null;
+
+      if (hex === runColor && hex !== null) {
+        runLen += step;
+      } else {
+        if (runColor !== null) {
+          paths += `<rect x="${runStart}" y="${y}" width="${runLen}" height="${step}" fill="${runColor}" shape-rendering="geometricPrecision"/>`;
+        }
+        runColor = hex;
+        runStart = x;
+        runLen = step;
       }
-      aside.sidebar {
-        width: 100%;
-        height: 45%;
-        border-right: none;
-        border-top: 1px solid var(--border-gray);
-        order: 2;
-      }
-      main.canvas-area {
-        height: 55%;
-        order: 1;
-      }
     }
-  </style>
-</head>
-<body>
+    if (runColor !== null) {
+      paths += `<rect x="${runStart}" y="${y}" width="${runLen}" height="${step}" fill="${runColor}" shape-rendering="geometricPrecision"/>`;
+    }
+  }
 
-  <header>
-    <div class="brand">
-      <h1>NALDO GRAFIC DESING</h1>
-      <span>PRO DTF & VECTORES</span>
-    </div>
-    <div class="top-actions">
-      <label class="file-label primary" for="imageInput">
-        📁 Importar Imagen (Todos los formatos)
-      </label>
-      <input type="file" id="imageInput" accept="image/*,.webp,.bmp,.tiff,.tif,.svg,.ico,.avif,.heic" />
+  currentSVGData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${paths}</svg>`;
+}
 
-      <button id="btnReset">↺ Restaurar Original</button>
-      <button id="btnDownloadPNG" class="primary">💾 Guardar PNG Transparente</button>
-      <button id="btnDownloadSVG">✒️ Guardar Vector SVG</button>
-    </div>
-  </header>
+// Descargar PNG Transparente del Lienzo Completo en Centímetros (300 DPI)
+document.getElementById('btnDownloadPNG').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'NALDO_GRAFIC_DESING_DTF.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
 
-  <div class="workspace">
-    <aside class="sidebar">
-      
-      <!-- 1. Lienzo Libre en Centímetros -->
-      <div class="tool-section">
-        <h3>📐 Lienzo Libre (Centímetros)</h3>
-        <div class="grid-2">
-          <div class="control-row">
-            <label>Ancho (cm)</label>
-            <input type="number" id="canvasWidthCm" value="28" min="1" max="200" step="0.5" />
-          </div>
-          <div class="control-row">
-            <label>Alto (cm)</label>
-            <input type="number" id="canvasHeightCm" value="40" min="1" max="300" step="0.5" />
-          </div>
-        </div>
-        <div class="control-row">
-          <label>Escala de Imagen en Lienzo: <span id="scaleVal">100%</span></label>
-          <input type="range" id="imgScale" min="10" max="200" value="100" />
-        </div>
-        <button id="btnApplyCanvas" style="width: 100%;">Aplicar Medidas (300 DPI)</button>
-      </div>
-
-      <!-- 2. Quitar Colores y Fondo Transparente -->
-      <div class="tool-section">
-        <h3>🎨 Quitar Fondo y Colores</h3>
-        <div class="control-row">
-          <label>Color a eliminar (o clic en el lienzo):</label>
-          <input type="color" id="targetColor" value="#ffffff" />
-        </div>
-        <div class="control-row">
-          <label>Tolerancia de borrado: <span id="tolVal">35</span></label>
-          <input type="range" id="colorTolerance" min="1" max="150" value="35" />
-        </div>
-        <div class="grid-2">
-          <button id="btnRemoveColor" class="primary">Quitar Color</button>
-          <button id="btnAutoBg">Auto Fondo</button>
-        </div>
-      </div>
-
-      <!-- 3. Eliminar Semitransparencias (Choke DTF) -->
-      <div class="tool-section">
-        <h3>🛡️ Limpiar Semitransparencias</h3>
-        <div class="control-row">
-          <label>Umbral sólido DTF: <span id="alphaVal">180</span></label>
-          <input type="range" id="alphaThreshold" min="10" max="250" value="180" />
-        </div>
-        <button id="btnCleanAlpha" style="width: 100%;">Eliminar Bordes Fantasma</button>
-      </div>
-
-      <!-- 4. Semitonos Redondos Activo -->
-      <div class="tool-section">
-        <h3>⚫ Semitonos Redondos (Halftone)</h3>
-        <div class="control-row">
-          <label>Tamaño de punto (px): <span id="dotSizeVal">6</span></label>
-          <input type="range" id="halftoneSize" min="3" max="20" value="6" />
-        </div>
-        <div class="control-row">
-          <label>Contraste de trama: <span id="contrastVal">1.1</span></label>
-          <input type="range" id="halftoneContrast" min="0.5" max="2.0" step="0.1" value="1.1" />
-        </div>
-        <button id="btnHalftone" class="primary" style="width: 100%;">🔘 Activar Semitonos Redondos</button>
-      </div>
-
-      <!-- 5. Vectorización Automática sin Píxeles -->
-      <div class="tool-section">
-        <h3>✒️ Vectorizar (Sin Píxeles)</h3>
-        <div class="control-row">
-          <label>Suavizado y precisión de curvas: <span id="vecDetailVal">4</span></label>
-          <input type="range" id="vecPrecision" min="1" max="10" value="4" />
-        </div>
-        <button id="btnVectorize" class="primary" style="width: 100%;">⚡ Vectorizar Automático</button>
-      </div>
-
-    </aside>
-
-    <main class="canvas-area">
-      <div class="ruler-info" id="canvasStatus">
-        Lienzo: 28 cm x 40 cm | Listo para importar imagen (Arrastra para mover)
-      </div>
-      <div class="artboard-wrapper" id="artboardWrapper" style="width: 420px; height: 600px;">
-        <canvas id="mainCanvas"></canvas>
-      </div>
-    </main>
-  </div>
-
-  <script src="script.js"></script>
-</body>
-</html>
+// Descargar Vector SVG
+document.getElementById('btnDownloadSVG').addEventListener('click', () => {
+  if (!currentSVGData) {
+    document.getElementById('btnVectorize').click();
+  }
+  const blob = new Blob([currentSVGData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = 'NALDO_GRAFIC_DESING_VECTOR.svg';
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+});
