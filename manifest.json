@@ -1,0 +1,16 @@
+{
+  "name": "NALDO GRAFIC DESING",
+  "short_name": "NaldoGrafic",
+  "description": "Estudio de preprensa DTF, eliminación de fondos, semitonos redondos y vectorización gratuita.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0c10",
+  "theme_color": "#1f6feb",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1055/1055666.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
