@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NALDO GRAFIC DESING - Preprensa DTF & Vectores</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root {
+      --bg-dark: #0a0c10;
+      --panel-gray: #161b22;
+      --border-gray: #30363d;
+      --accent-blue: #1f6feb;
+      --accent-blue-hover: #388bfd;
+      --text-light: #f0f6fc;
+      --text-muted: #8b949e;
+      --canvas-dtf: #505050;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Barra Superior */
+    header {
+      background-color: var(--panel-gray);
+      border-bottom: 2px solid var(--accent-blue);
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand h1 {
+      font-size: 1.3rem;
+      letter-spacing: 1.5px;
+      color: var(--text-light);
+    }
+
+    .brand span {
+      background: var(--accent-blue);
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button, .file-label {
+      background-color: #21262d;
+      color: var(--text-light);
+      border: 1px solid var(--border-gray);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover, .file-label:hover {
+      border-color: var(--accent-blue);
+      background-color: #29313d;
+    }
+
+    button.primary, .file-label.primary {
+      background-color: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #ffffff;
+    }
+
+    button.primary:hover, .file-label.primary:hover {
+      background-color: var(--accent-blue-hover);
+    }
+
+    button.active-tool {
+      background-color: #0d419d;
+      border-color: #58a6ff;
+      box-shadow: 0 0 8px rgba(56, 139, 253, 0.5);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    /* Contenedor Principal */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Panel Izquierdo de Herramientas */
+    aside.sidebar {
+      width: 310px;
+      background-color: var(--panel-gray);
+      border-right: 1px solid var(--border-gray);
+      padding: 15px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .tool-section {
+      background-color: #0d1117;
+      border: 1px solid var(--border-gray);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .tool-section h3 {
+      font-size: 0.85rem;
+      color: #58a6ff;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border-gray);
+      padding-bottom: 5px;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .control-row label {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-light);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    input[type="number"], select {
+      background-color: #161b22;
+      border: 1px solid var(--border-gray);
+      color: var(--text-light);
+      padding: 6px;
+      border-radius: 4px;
+      width: 100%;
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent-blue);
+      width: 100%;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 32px;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+
+    /* Área del Lienzo Libre */
+    main.canvas-area {
+      flex: 1;
+      background-color: #050709;
+      background-image: radial-gradient(#21262d 1px, transparent 1px);
+      background-size: 20px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: auto;
+      padding: 30px;
+    }
+
+    .ruler-info {
+      position: absolute;
+      top: 10px;
+      left: 15px;
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid var(--accent-blue);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: #58a6ff;
+      z-index: 10;
+    }
+
+    .artboard-wrapper {
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8);
+      border: 2px solid var(--accent-blue);
+      background-color: var(--canvas-dtf);
+      background-image:
+        linear-gradient(45deg, #424242 25%, transparent 25%),
+        linear-gradient(-45deg, #424242 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #424242 75%),
+        linear-gradient(-45deg, transparent 75%, #424242 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: width 0.2s, height 0.2s;
+    }
+
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    @media (max-width: 768px) {
+      .workspace {
+        flex-direction: column;
+      }
+      aside.sidebar {
+        width: 100%;
+        height: 45%;
+        border-right: none;
+        border-top: 1px solid var(--border-gray);
+        order: 2;
+      }
+      main.canvas-area {
+        height: 55%;
+        order: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <h1>NALDO GRAFIC DESING</h1>
+      <span>PRO DTF & VECTORES</span>
+    </div>
+    <div class="top-actions">
+      <label class="file-label primary" for="imageInput">
+        📁 Importar Imagen (Todos los formatos)
+      </label>
+      <input type="file" id="imageInput" accept="image/*,.webp,.bmp,.tiff,.tif,.svg,.ico,.avif,.heic" />
+
+      <button id="btnReset">↺ Restaurar Original</button>
+      <button id="btnDownloadPNG" class="primary">💾 Guardar PNG Transparente</button>
+      <button id="btnDownloadSVG">✒️ Guardar Vector SVG</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      
+      <!-- 1. Lienzo Libre en Centímetros -->
+      <div class="tool-section">
+        <h3>📐 Lienzo Libre (Centímetros)</h3>
+        <div class="grid-2">
+          <div class="control-row">
+            <label>Ancho (cm)</label>
+            <input type="number" id="canvasWidthCm" value="28" min="1" max="200" step="0.5" />
+          </div>
+          <div class="control-row">
+            <label>Alto (cm)</label>
+            <input type="number" id="canvasHeightCm" value="40" min="1" max="300" step="0.5" />
+          </div>
+        </div>
+        <div class="control-row">
+          <label>Escala de Imagen en Lienzo: <span id="scaleVal">100%</span></label>
+          <input type="range" id="imgScale" min="10" max="200" value="100" />
+        </div>
+        <button id="btnApplyCanvas" style="width: 100%;">Aplicar Medidas (300 DPI)</button>
+      </div>
+
+      <!-- 2. Quitar Colores y Fondo Transparente -->
+      <div class="tool-section">
+        <h3>🎨 Quitar Fondo y Colores</h3>
+        <div class="control-row">
+          <label>Color a eliminar (o clic en el lienzo):</label>
+          <input type="color" id="targetColor" value="#ffffff" />
+        </div>
+        <div class="control-row">
+          <label>Tolerancia de borrado: <span id="tolVal">35</span></label>
+          <input type="range" id="colorTolerance" min="1" max="150" value="35" />
+        </div>
+        <div class="grid-2">
+          <button id="btnRemoveColor" class="primary">Quitar Color</button>
+          <button id="btnAutoBg">Auto Fondo</button>
+        </div>
+      </div>
+
+      <!-- 3. Eliminar Semitransparencias (Choke DTF) -->
+      <div class="tool-section">
+        <h3>🛡️ Limpiar Semitransparencias</h3>
+        <div class="control-row">
+          <label>Umbral sólido DTF: <span id="alphaVal">180</span></label>
+          <input type="range" id="alphaThreshold" min="10" max="250" value="180" />
+        </div>
+        <button id="btnCleanAlpha" style="width: 100%;">Eliminar Bordes Fantasma</button>
+      </div>
+
+      <!-- 4. Semitonos Redondos Activo -->
+      <div class="tool-section">
+        <h3>⚫ Semitonos Redondos (Halftone)</h3>
+        <div class="control-row">
+          <label>Tamaño de punto (px): <span id="dotSizeVal">6</span></label>
+          <input type="range" id="halftoneSize" min="3" max="20" value="6" />
+        </div>
+        <div class="control-row">
+          <label>Contraste de trama: <span id="contrastVal">1.1</span></label>
+          <input type="range" id="halftoneContrast" min="0.5" max="2.0" step="0.1" value="1.1" />
+        </div>
+        <button id="btnHalftone" class="primary" style="width: 100%;">🔘 Activar Semitonos Redondos</button>
+      </div>
+
+      <!-- 5. Vectorización Automática sin Píxeles -->
+      <div class="tool-section">
+        <h3>✒️ Vectorizar (Sin Píxeles)</h3>
+        <div class="control-row">
+          <label>Suavizado y precisión de curvas: <span id="vecDetailVal">4</span></label>
+          <input type="range" id="vecPrecision" min="1" max="10" value="4" />
+        </div>
+        <button id="btnVectorize" class="primary" style="width: 100%;">⚡ Vectorizar Automático</button>
+      </div>
+
+    </aside>
+
+    <main class="canvas-area">
+      <div class="ruler-info" id="canvasStatus">
+        Lienzo: 28 cm x 40 cm | Listo para importar imagen (Arrastra para mover)
+      </div>
+      <div class="artboard-wrapper" id="artboardWrapper" style="width: 420px; height: 600px;">
+        <canvas id="mainCanvas"></canvas>
+      </div>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
